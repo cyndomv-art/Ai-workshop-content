@@ -1,7 +1,0 @@
-{
-  "name": "ai-workshop-survey",
-  "description": "Post-workshop survey system for AI Workshop",
-  "require": {
-    "php": ">=7.0"
-  }
-}
