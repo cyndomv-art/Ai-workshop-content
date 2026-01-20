@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Survey Admin Dashboard — AI Workshop</title>
+  <style>
+    :root{--navy:#1B3B6F;--gold:#C19A6B}
+    body{font-family:Inter,system-ui, -apple-system,'Segoe UI',Roboto,Arial;margin:0;color:#102030;background:#f8fafc}
+    .wrap{max-width:1000px;margin:28px auto;padding:20px}
+    header{background:var(--navy);color:white;padding:14px;border-radius:8px;text-align:center}
+    .branding{margin-bottom:5px;color:var(--gold);font-size:14px}
+    h1{margin:0;font-size:24px}
+    .card{background:#fff;border-radius:8px;padding:16px;margin-top:14px;border-left:4px solid var(--gold);box-shadow:0 4px 12px rgba(0,0,0,0.05)}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+    .stat{background:#f7fafc;padding:16px;border-radius:8px;flex:1;min-width:200px;text-align:center;border:1px solid #e6e9ef}
+    .stat strong{font-size:24px;color:var(--navy)}
+    .muted{color:#6b7280;font-size:14px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left}
+    th{background:#f8fafc;font-weight:600}
+    .filters{margin-bottom:15px}
+    .filter-btn{background:#e6e9ef;color:#333;padding:8px 12px;border:none;border-radius:4px;margin-right:8px;cursor:pointer}
+    .filter-btn.active{background:var(--navy);color:white}
+    .testimonial{background:#f9f9f9;padding:12px;border-radius:6px;margin:8px 0;border-left:3px solid var(--gold)}
+    .testimonial cite{font-style:italic;color:#666;margin-top:5px;display:block}
+    .lead-item{background:#fff8e1;padding:10px;border-radius:6px;margin:6px 0;border-left:3px solid #ff9800}
+    .breakdown{margin-top:15px}
+    .breakdown-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="branding">Cynthia Vazquez | Lead with Impact</div>
+      <h1>AI Workshop Survey Dashboard</h1>
+      <p class="muted" style="margin-top:5px">Real-time insights from post-workshop feedback</p>
+    </header>
+
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><strong id="total">0</strong><div class="muted">Total responses</div></div>
+        <div class="stat"><strong id="avgNps">—</strong><div class="muted">Average NPS</div></div>
+        <div class="stat"><strong id="avgGain">—</strong><div class="muted">Average confidence gain</div></div>
+        <div class="stat"><strong id="gptSuccess">—</strong><div class="muted">GPT build success rate</div></div>
+      </div>
+
+      <div class="breakdown">
+        <h3>GPT Building Breakdown</h3>
+        <div id="gptBreakdown">Loading…</div>
+      </div>
+
+      <div class="breakdown">
+        <h3>Most Popular "Implement First" Skill</h3>
+        <div id="skillsBreakdown">Loading…</div>
+      </div>
+
+      <div class="filters">
+        <button class="filter-btn active" onclick="filterTestimonials('all')">All Testimonials</button>
+        <button class="filter-btn" onclick="filterTestimonials('nps9')">NPS 9-10 Only</button>
+        <button class="filter-btn" onclick="filterTestimonials('highImpact')">High Impact</button>
+      </div>
+      <h3>Public Testimonials</h3>
+      <div id="testimonials">Loading…</div>
+
+      <div class="filters" style="margin-top:20px">
+        <button class="filter-btn active" onclick="filterLeads('all')">All Leads</button>
+        <button class="filter-btn" onclick="filterLeads('nps9')">NPS 9-10</button>
+        <button class="filter-btn" onclick="filterLeads('paid')">Interested in Paid Services</button>
+      </div>
+      <h3>High-Priority Leads</h3>
+      <div id="leads">Loading…</div>
+
+      <h3 style="margin-top:20px">Quick Wins - Early Adopters</h3>
+      <div id="earlyAdopters">Loading…</div>
+
+      <h3 style="margin-top:20px">All Responses (most recent first)</h3>
+      <table id="responses">
+        <thead><tr><th>Name</th><th>Email</th><th>NPS</th><th>Conf Gain</th><th>Implement First</th><th>Built GPT</th><th>Submitted</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let allResponses = [];
+    let allTestimonials = [];
+    let allLeads = [];
+    let allEarlyAdopters = [];
+
+    async function load(){
+      try {
+        const r = await fetch('responses.json');
+        allResponses = await r.json();
+        document.getElementById('total').textContent = allResponses.length;
+
+        const npsVals = allResponses.map(x=>parseInt(x.nps||0,10)).filter(Boolean);
+        const avgNps = npsVals.length? (npsVals.reduce((a,b)=>a+b,0)/npsVals.length).toFixed(2):'—';
+        document.getElementById('avgNps').textContent = avgNps;
+
+        const gains = allResponses.map(x=>parseFloat(x.confGain||0));
+        const avgGain = gains.length? (gains.reduce((a,b)=>a+b,0)/gains.length).toFixed(2):'—';
+        document.getElementById('avgGain').textContent = avgGain;
+
+        // GPT success rate
+        const gptBuilt = allResponses.filter(x=>x.builtGPT === 'Yes').length;
+        const totalGpt = allResponses.filter(x=>x.builtGPT).length;
+        const gptRate = totalGpt ? ((gptBuilt / totalGpt) * 100).toFixed(1) + '%' : '—';
+        document.getElementById('gptSuccess').textContent = gptRate;
+
+        // GPT breakdown
+        const breakdown = {};
+        allResponses.forEach(r => {
+          const status = r.builtGPT || 'Not specified';
+          breakdown[status] = (breakdown[status] || 0) + 1;
+        });
+        const breakdownHtml = Object.keys(breakdown).map(k => `<div class="breakdown-item"><span>${k}</span><span><strong>${breakdown[k]}</strong></span></div>`).join('');
+        document.getElementById('gptBreakdown').innerHTML = breakdownHtml || 'No data yet.';
+
+        // Skills breakdown
+        const skills = {};
+        allResponses.forEach(r => {
+          const skill = r.implementFirst || 'Not specified';
+          skills[skill] = (skills[skill] || 0) + 1;
+        });
+        const sortedSkills = Object.keys(skills).sort((a,b)=>skills[b]-skills[a]);
+        const skillsHtml = sortedSkills.slice(0,5).map(k => `<div class="breakdown-item"><span>${k}</span><span><strong>${skills[k]}</strong></span></div>`).join('');
+        document.getElementById('skillsBreakdown').innerHTML = skillsHtml || 'No data yet.';
+
+        // testimonials
+        const t = await fetch('testimonials.json');
+        allTestimonials = await t.json();
+        displayTestimonials('all');
+
+        // leads
+        const l = await fetch('leads.json');
+        allLeads = await l.json();
+        displayLeads('all');
+
+        // early adopters
+        const e = await fetch('early_adopters.json');
+        allEarlyAdopters = await e.json();
+        const adoptersHtml = allEarlyAdopters.length ? allEarlyAdopters.map(ad => `<div class="lead-item"><strong>${ad.name}</strong> (${ad.title})<br>${ad.testedGPT}<br><em>${ad.gptUse || 'No specific use mentioned'}</em></div>`).join('') : 'No early adopters yet.';
+        document.getElementById('earlyAdopters').innerHTML = adoptersHtml;
+
+        // responses table
+        const tbody = document.querySelector('#responses tbody');
+        const sorted = allResponses.slice().sort((a,b)=> new Date(b.submittedAt) - new Date(a.submittedAt));
+        tbody.innerHTML = sorted.map(r=>`<tr><td>${r.fullName||''}</td><td>${r.email||''}</td><td>${r.nps||''}</td><td>${r.confGain||''}</td><td>${r.implementFirst||''}</td><td>${r.builtGPT||''}</td><td>${r.submittedAt? new Date(r.submittedAt).toLocaleString() : ''}</td></tr>`).join('');
+      } catch(err){
+        console.error(err);
+        document.querySelector('.card').innerText = 'Unable to load data. Ensure JSON files exist and are readable on the server.';
+      }
+    }
+
+    function displayTestimonials(filter) {
+      let filtered = allTestimonials;
+      if(filter === 'nps9') filtered = allTestimonials.filter(t => t.nps >= 9);
+      if(filter === 'highImpact') filtered = allTestimonials.filter(t => t.highImpact);
+
+      const html = filtered.length ? filtered.map(pt=>`<div class="testimonial"><strong>"${pt.quote}"</strong><cite>${pt.name}, ${pt.title}</cite><div class="muted">NPS: ${pt.nps}, Conf Gain: ${pt.confGain}</div></div>`).join('') : 'No testimonials match this filter.';
+      document.getElementById('testimonials').innerHTML = html;
+    }
+
+    function filterTestimonials(filter) {
+      document.querySelectorAll('.filters button[onclick*="filterTestimonials"]').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      displayTestimonials(filter);
+    }
+
+    function displayLeads(filter) {
+      let filtered = allLeads;
+      if(filter === 'nps9') filtered = allLeads.filter(l => l.nps >= 9);
+      if(filter === 'paid') filtered = allLeads.filter(l => l.interest && l.interest.some(i => ['1-on-1 AI Strategy Coaching','Custom Team Workshop for My Organization','AI Implementation Consulting'].includes(i)));
+
+      const html = filtered.length ? filtered.map(ld=>`<div class="lead-item"><strong>${ld.name}</strong> — ${ld.email}<br><em>${ld.title}</em><br>Interests: ${ld.interest ? ld.interest.join(', ') : 'None'}<br>NPS: ${ld.nps}</div>`).join('') : 'No leads match this filter.';
+      document.getElementById('leads').innerHTML = html;
+    }
+
+    function filterLeads(filter) {
+      document.querySelectorAll('.filters button[onclick*="filterLeads"]').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      displayLeads(filter);
+    }
+
+    load();
+  </script>
+</body>
+</html>
